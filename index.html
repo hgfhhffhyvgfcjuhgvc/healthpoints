@@ -102,7 +102,7 @@ function renderTasks(){
   main.innerHTML='';
   TASKS.forEach(t=>{
     const btn=document.createElement('button');
-    btn.className='w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 active:bg-emerald-700 transition-colors duration-3000 shadow';
+    btn.className='w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 active:bg-emerald-700 transition-colors duration-300 shadow';
     btn.innerHTML=`${t.name}<span class='float-right font-semibold'>+${t.pts}</span>`;
     btn.onclick=()=>{
       addPoints(today,t.pts);
