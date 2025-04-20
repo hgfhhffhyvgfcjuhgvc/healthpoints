@@ -17,6 +17,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+
   <!-- HEADER -->
   <header class="p-4 bg-gray-800 shadow flex items-center justify-between">
     <div class="text-lg font-bold">Score du jour : <span id="dailyScore" class="text-emerald-400">0</span></div>
@@ -33,65 +34,72 @@
   </nav>
 
   <main id="mainContent" class="flex-1 overflow-y-auto p-4"></main>
-  <footer class="text-center text-xs text-gray-500 py-2">© 2025 – Liberté !</footer>
+  <footer class="text-center text-xs text-gray-500 py-2">© 2025 – Liberté !</footer>
 
 <script>
-/***** 1. Firebase init *****/
-firebase.initializeApp({ apiKey:"AIzaSyCssm-z4wtOWcK1qvbJc2SIQ6Pvc3JEszY", authDomain:"health-fdf5b.firebaseapp.com", projectId:"health-fdf5b" });
-const auth=firebase.auth(); const db=firebase.firestore();
+/* ---------- 1. FIREBASE ---------- */
+firebase.initializeApp({
+  apiKey: "AIzaSyCssm-z4wtOWcK1qvbJc2SIQ6Pvc3JEszY",
+  authDomain: "health-fdf5b.firebaseapp.com",
+  projectId: "health-fdf5b"
+});
+const auth = firebase.auth();
+const db   = firebase.firestore();
 let remoteDocRef;
 
-/***** 2. Storage helpers *****/
-const LS_KEY='dpt-db';
-const todayStr=()=>new Date().toISOString().slice(0,10);
-const loadData=()=>JSON.parse(localStorage.getItem(LS_KEY)||'{}');
-const saveData=d=>localStorage.setItem(LS_KEY,JSON.stringify(d));
-const getDayTotal=d=>loadData()[d]||0;
+/* ---------- 2. LOCAL STORAGE ---------- */
+const LS_KEY = 'dpt-db';
+const todayStr = () => new Date().toISOString().slice(0,10);
+const loadData = () => JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+const saveData = d => localStorage.setItem(LS_KEY, JSON.stringify(d));
+const getDayTotal = d => loadData()[d] || 0;
 
-/***** 3. Tasks *****/
-const TASKS=[
-  {id:1,name:"Boire un verre d'eau",pts:1},
-  {id:2,name:"Étirements matinaux",pts:2},
-  {id:3,name:"Méditation 5 min",pts:3},
-  {id:4,name:"Marche 10 min",pts:2},
-  {id:5,name:"Lecture 10 pages",pts:4}
+/* ---------- 3. TASKS ---------- */
+const TASKS = [
+  {id: 1, name: "Boire un verre d'eau",      pts: 1},
+  {id: 2, name: "Étirements matinaux",       pts: 2},
+  {id: 3, name: "Méditation 5 min",          pts: 3},
+  {id: 4, name: "Marche 10 min",             pts: 2},
+  {id: 5, name: "Lecture 10 pages",          pts: 4}
 ];
 
-/***** 4. UI refs *****/
-const scoreEl=document.getElementById('dailyScore');
-const labelEl=document.getElementById('todayLabel');
-const main=document.getElementById('mainContent');
-const tabTasks=document.getElementById('tabTasks');
-const tabStats=document.getElementById('tabStats');
-const resetBtn=document.getElementById('resetBtn');
-let chartInstance=null,currentTab='tasks',currentRange='7';
+/* ---------- 4. UI REFERENCES ---------- */
+const scoreEl  = document.getElementById('dailyScore');
+const labelEl  = document.getElementById('todayLabel');
+const main     = document.getElementById('mainContent');
+const tabTasks = document.getElementById('tabTasks');
+const tabStats = document.getElementById('tabStats');
+const resetBtn = document.getElementById('resetBtn');
+let chartInstance = null, currentTab = 'tasks', currentRange = '7';
 
-/***** 5. Renderers *****/
+/* ---------- 5. RENDERERS ---------- */
 function setActive(tab){
-  currentTab=tab;
-  tabTasks.classList.toggle('bg-emerald-600',tab==='tasks');
-  tabTasks.classList.toggle('bg-gray-700',tab!=='tasks');
-  tabStats.classList.toggle('bg-emerald-600',tab==='stats');
-  tabStats.classList.toggle('bg-gray-700',tab!=='stats');
+  currentTab = tab;
+  tabTasks.classList.toggle('bg-emerald-600', tab === 'tasks');
+  tabTasks.classList.toggle('bg-gray-700',   tab !== 'tasks');
+  tabStats.classList.toggle('bg-emerald-600', tab === 'stats');
+  tabStats.classList.toggle('bg-gray-700',   tab !== 'stats');
 }
+
 function renderTasks(){
   setActive('tasks');
-  const today=todayStr();
-  scoreEl.textContent=getDayTotal(today);
-  labelEl.textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'});
-  main.innerHTML='';
+  const today = todayStr();
+  scoreEl.textContent = getDayTotal(today);
+  labelEl.textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'});
+  main.innerHTML = '';
   TASKS.forEach(t=>{
-    const btn=document.createElement('button');
-    btn.className='w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 hover:bg-emerald-700 shadow';
-    btn.innerHTML=`${t.name}<span class='float-right font-semibold'>+${t.pts}</span>`;
-    btn.onclick=()=>{addPoints(today,t.pts);scoreEl.textContent=getDayTotal(today);} ;
+    const btn = document.createElement('button');
+    btn.className = 'w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 hover:bg-emerald-700 shadow';
+    btn.innerHTML = `${t.name}<span class='float-right font-semibold'>+${t.pts}</span>`;
+    btn.onclick   = ()=>{ addPoints(today,t.pts); scoreEl.textContent = getDayTotal(today); };
     main.appendChild(btn);
   });
 }
+
 function renderStats(){
   setActive('stats');
-  labelEl.textContent='';
-  main.innerHTML=`<div class='flex flex-wrap gap-2 mb-4'>
+  labelEl.textContent = '';
+  main.innerHTML = `<div class='flex flex-wrap gap-2 mb-4'>
     <button class='range bg-gray-700 px-3 py-1 rounded' data-r='7'>7 jours</button>
     <button class='range bg-gray-700 px-3 py-1 rounded' data-r='30'>30 jours</button>
     <button class='range bg-gray-700 px-3 py-1 rounded' data-r='90'>90 jours</button>
@@ -99,52 +107,80 @@ function renderStats(){
   </div>
   <canvas id='statsChart' class='w-full mb-6'></canvas>
   <div id='stats'></div>`;
-  document.querySelectorAll('.range').forEach(b=>b.onclick=e=>renderRange(e.target.dataset.r));
+  document.querySelectorAll('.range').forEach(b=>b.onclick = e=>renderRange(e.target.dataset.r));
   renderRange(currentRange);
 }
+
 function renderRange(r){
-  currentRange=r;
-  const dbData=loadData(),labels=[],values=[];
-  if(r==='m'){
+  currentRange = r;
+  const dbData = loadData(), labels=[], values=[];
+  if(r === 'm'){
     const monthly={};
-    for(const [d,v] of Object.entries(dbData)){const k=d.slice(0,7);monthly[k]=(monthly[k]||0)+v;}
-    Object.keys(monthly).sort().slice(-12).forEach(k=>{labels.push(new Date(k+'-01').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'}));values.push(monthly[k]);});
+    for(const [d,v] of Object.entries(dbData)){ const k=d.slice(0,7); monthly[k]=(monthly[k]||0)+v; }
+    Object.keys(monthly).sort().slice(-12).forEach(k=>{
+      labels.push(new Date(k+'-01').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'}));
+      values.push(monthly[k]);
+    });
   }else{
     const n=parseInt(r,10);
-    for(let i=n-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const k=d.toISOString().slice(0,10);labels.push(d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'}));values.push(dbData[k]||0);} }
+    for(let i=n-1;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i);
+      const k=d.toISOString().slice(0,10);
+      labels.push(d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'}));
+      values.push(dbData[k]||0);
+    }
+  }
   const ctx=document.getElementById('statsChart').getContext('2d');
-  chartInstance&&chartInstance.destroy();
+  chartInstance && chartInstance.destroy();
   chartInstance=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data:values}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#d1d5db'},grid:{display:false}},y:{beginAtZero:true,ticks:{color:'#d1d5db'},grid:{color:'#374151'}}}}});
-  const list=document.getElementById('stats');list.innerHTML='';labels.forEach((l,i)=>{const row=document.createElement('div');row.className='flex justify-between border-b border-gray-700 py-2';row.innerHTML=`<span>${l}</span><span class='font-semibold text-emerald-400'>${values[i]}</span>`;list.appendChild(row);});
+  const list=document.getElementById('stats'); list.innerHTML='';
+  labels.forEach((l,i)=>{ const row=document.createElement('div'); row.className='flex justify-between border-b border-gray-700 py-2'; row.innerHTML=`<span>${l}</span><span class='font-semibold text-emerald-400'>${values[i]}</span>`; list.appendChild(row); });
 }
 
-/***** 6. Sync helpers *****/
+/* ---------- 6. SYNC ---------- */
 function addPoints(d,pts){
-  const dbData=loadData();dbData[d]=(dbData[d]||0)+pts;saveData(dbData);
-  remoteDocRef&&remoteDocRef.set(dbData).catch(console.error);
-}
-function resetToday(){
-  const d=todayStr();
-  const dbData=loadData();
-  dbData[d]=0;
+  const dbData = loadData();
+  dbData[d] = (dbData[d]||0) + pts;
   saveData(dbData);
-  remoteDocRef&&remoteDocRef.set(dbData).catch(console.error);
-  scoreEl.textContent='0';
-  if(currentTab==='stats')renderRange(currentRange);
+  remoteDocRef && remoteDocRef.set(dbData).catch(console.error);
 }
+
+function resetToday(){
+  const d = todayStr();
+  const dbData = loadData();
+  dbData[d] = 0;
+  saveData(dbData);
+  remoteDocRef && remoteDocRef.set(dbData).catch(console.error);
+  scoreEl.textContent = '0';
+  if(currentTab==='stats') renderRange(currentRange);
+}
+
 function startRealtimeSync(){
   remoteDocRef.onSnapshot(snap=>{
-    if(!snap.exists)return;
-    localStorage.setItem(LS_KEY,JSON.stringify(snap.data()));
-    scoreEl.textContent=getDayTotal(todayStr());
-    if(currentTab==='stats')renderRange(currentRange);
+    if(!snap.exists) return;
+    localStorage.setItem(LS_KEY, JSON.stringify(snap.data()));
+    scoreEl.textContent = getDayTotal(todayStr());
+    if(currentTab==='stats') renderRange(currentRange);
   });
 }
 
-/***** 7. Init flow *****/
-function initUI(){ tabTasks.onclick=renderTasks; tabStats.onclick=renderStats; resetBtn.onclick=resetToday; renderTasks(); }
+/* ---------- 7. INIT ---------- */
+function initUI(){
+  tabTasks.onclick = renderTasks;
+  tabStats.onclick = renderStats;
+  resetBtn.onclick = resetToday;
+  renderTasks();
+}
 
 auth.signInAnonymously().then(()=>{
-  remoteDocRef=db.collection('users').doc('global');
+  remoteDocRef = db.collection('users').doc('global');        // doc unique partagé
   remoteDocRef.get().then(snap=>{
-    if(snap.exists) localStorage.setItem
+    if(snap.exists) localStorage.setItem(LS_KEY, JSON.stringify(snap.data()));
+    initUI(); startRealtimeSync();
+  }).catch(err=>{ console.error(err); initUI(); });
+}).catch(console.error);
+
+/* ---------- 8. PWA offline ---------- */
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw-v2.js').catch(console.error);
+</script>
+</body>
+</html>
