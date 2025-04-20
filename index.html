@@ -137,7 +137,12 @@ function renderRange(r){
   chartInstance && chartInstance.destroy();
   chartInstance=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data:values}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#d1d5db'},grid:{display:false}},y:{beginAtZero:true,ticks:{color:'#d1d5db'},grid:{color:'#374151'}}}}});
   const list=document.getElementById('stats'); list.innerHTML='';
-  labels.forEach((l,i)=>{ const row=document.createElement('div'); row.className='flex justify-between border-b border-gray-700 py-2'; row.innerHTML=`<span>${l}</span><span class='font-semibold text-emerald-400'>${values[i]}</span>`; list.appendChild(row); });
+  for (let i = labels.length - 1; i >= 0; i--) {
+  const row = document.createElement('div');
+  row.className = 'flex justify-between border-b border-gray-700 py-2';
+  row.innerHTML = `<span>${labels[i]}</span><span class='font-semibold text-emerald-400'>${values[i]}</span>`;
+  list.appendChild(row);
+}
 }
 
 /* ---------- 6. SYNC ---------- */
