@@ -116,13 +116,19 @@ function renderTasks(){
     const btn=document.createElement('button');
     btn.className='w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 active:bg-emerald-700 transition-colors duration-500 shadow';
     btn.innerHTML=`${t.name}<span class='float-right font-semibold'>+${t.pts}</span>`;
-    btn.onclick=()=>{
-      addPoints(today,t.pts);
-      if (navigator.vibrate) navigator.vibrate(15);  // retour haptique
-      scoreEl.textContent=getDayTotal(today);
-      showToast(`+${t.pts} pts ✅`);
-      flash(btn);
-    };
+    btn.onclick = () => {
+  addPoints(today, t.pts);
+  scoreEl.textContent = getDayTotal(today);
+  showToast(`+${t.pts} pts ✅`);
+
+  /* >>> feedback audio + anim */
+  const snd = document.getElementById('tapSnd');
+  if (snd) { snd.currentTime = 0; snd.play().catch(()=>{}); }
+
+  btn.classList.add('btn-press');
+  setTimeout(() => btn.classList.remove('btn-press'), 150);
+};
+
     main.appendChild(btn);
   });
 }
