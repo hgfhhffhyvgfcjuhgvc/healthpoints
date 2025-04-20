@@ -106,6 +106,7 @@ function renderTasks(){
     btn.innerHTML=`${t.name}<span class='float-right font-semibold'>+${t.pts}</span>`;
     btn.onclick=()=>{
       addPoints(today,t.pts);
+      if (navigator.vibrate) navigator.vibrate(15);  // retour haptique
       scoreEl.textContent=getDayTotal(today);
       showToast(`+${t.pts} pts ✅`);
       flash(btn);
