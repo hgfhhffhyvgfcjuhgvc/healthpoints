@@ -4,10 +4,31 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Daily Points Tracker</title>
-  <!-- Tailwind CSS -->
+
+  <!-- Tailwind & chart.js -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCssm-z4wtOWcK1qvbJc2SIQ6Pvc3JEszY",
+      authDomain: "health-fdf5b.firebaseapp.com",
+      projectId: "health-fdf5b",
+      storageBucket: "health-fdf5b.appspot.com",
+      messagingSenderId: "304202917649",
+      appId: "1:304202917649:web:23d6ead24ddb2033378eb0",
+      measurementId: "G-G15TPJPXKN"
+    };
+    firebase.initializeApp(firebaseConfig);
+    /* objets prêts pour la synchronisation (prochaine étape) */
+    const auth     = firebase.auth();
+    const dbRemote = firebase.firestore();
+  </script>
+
   <link rel="manifest" href="manifest.webmanifest" />
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
@@ -23,10 +44,10 @@
   </nav>
 
   <main id="mainContent" class="flex-1 overflow-y-auto p-4"></main>
-  <footer class="text-center text-xs text-gray-500 py-2">© 2025 – Liberté & motivations !</footer>
+  <footer class="text-center text-xs text-gray-500 py-2">© 2025 – Liberté & motivations !</footer>
 
 <script>
-/******** CONFIG ********/ 
+/******** CONFIG ********/
 const TASKS = [
   { id: 1, name: "Boire un verre d'eau", pts: 1 },
   { id: 2, name: "Étirements matinaux", pts: 2 },
@@ -36,46 +57,48 @@ const TASKS = [
 ];
 const LS_KEY = 'dpt-db';
 
-/******** HELPERS ********/ 
+/******** HELPERS ********/
 const todayStr = () => new Date().toISOString().slice(0,10);
-function loadData(){ return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); }
-function saveData(db){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
-function getDayTotal(date){ const db=loadData(); return db[date]||0; }
-function addPoints(date, pts){ const db=loadData(); db[date]=getDayTotal(date)+pts; saveData(db); }
+const loadData = () => JSON.parse(localStorage.getItem(LS_KEY)||'{}');
+const saveData = db => localStorage.setItem(LS_KEY, JSON.stringify(db));
+const getDayTotal = d => loadData()[d] || 0;
+function addPoints(d, pts){
+  const db = loadData();
+  db[d] = getDayTotal(d) + pts;
+  saveData(db);            // (sync distant à venir)
+}
 
-/******** UI ********/ 
-const scoreEl=document.getElementById('dailyScore');
-const labelEl=document.getElementById('todayLabel');
-const main=document.getElementById('mainContent');
-let chartInstance=null; // Chart.js instance
+/******** UI ********/
+const scoreEl = document.getElementById('dailyScore');
+const labelEl = document.getElementById('todayLabel');
+const main    = document.getElementById('mainContent');
+let chartInstance=null, currentTab='tasks', currentRange='7';
 
 function setActive(tab){
-  document.getElementById('tabTasks').className=`px-4 py-2 rounded-lg font-semibold ${tab==='tasks'?'bg-emerald-600':'bg-gray-700'}`;
-  document.getElementById('tabStats').className=`px-4 py-2 rounded-lg font-semibold ${tab==='stats'?'bg-emerald-600':'bg-gray-700'}`;
+  currentTab = tab;
+  document.getElementById('tabTasks').className = `px-4 py-2 rounded-lg font-semibold ${tab==='tasks'?'bg-emerald-600':'bg-gray-700'}`;
+  document.getElementById('tabStats').className = `px-4 py-2 rounded-lg font-semibold ${tab==='stats'?'bg-emerald-600':'bg-gray-700'}`;
 }
 
 function renderTasks(){
   setActive('tasks');
-  const today=todayStr();
-  scoreEl.textContent=getDayTotal(today);
-  labelEl.textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'});
-  main.innerHTML='';
+  const today = todayStr();
+  scoreEl.textContent = getDayTotal(today);
+  labelEl.textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'});
+  main.innerHTML = '';
   TASKS.forEach(t=>{
-    const btn=document.createElement('button');
-    btn.className='w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 hover:bg-emerald-700 shadow';
-    btn.innerHTML=`${t.name}<span class='float-right font-semibold'>+${t.pts}</span>`;
-    btn.addEventListener('click',()=>{
-      addPoints(today,t.pts);
-      scoreEl.textContent=getDayTotal(today);
-    });
+    const btn = document.createElement('button');
+    btn.className = 'w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 hover:bg-emerald-700 shadow';
+    btn.innerHTML = `${t.name}<span class='float-right font-semibold'>+${t.pts}</span>`;
+    btn.onclick = () => { addPoints(today,t.pts); scoreEl.textContent = getDayTotal(today); };
     main.appendChild(btn);
   });
 }
 
 function renderStats(){
   setActive('stats');
-  labelEl.textContent='';
-  main.innerHTML=`<div class='flex flex-wrap gap-2 mb-4'>
+  labelEl.textContent = '';
+  main.innerHTML = `<div class='flex flex-wrap gap-2 mb-4'>
       <button class='range bg-gray-700 px-3 py-1 rounded' data-r='7'>7 jours</button>
       <button class='range bg-gray-700 px-3 py-1 rounded' data-r='30'>30 jours</button>
       <button class='range bg-gray-700 px-3 py-1 rounded' data-r='90'>90 jours</button>
@@ -84,26 +107,23 @@ function renderStats(){
   <canvas id='statsChart' class='w-full max-w-full mb-6'></canvas>
   <div id='stats'></div>`;
   document.querySelectorAll('.range').forEach(b=>b.onclick=e=>renderRange(e.target.dataset.r));
-  renderRange('7');
+  renderRange(currentRange);
 }
 
 function renderRange(range){
-  const db=loadData();
-  const statsDiv=document.getElementById('stats');
-  statsDiv.innerHTML='';
-
-  // Prepare data arrays
+  currentRange = range;
+  const db = loadData();
+  const statsDiv = document.getElementById('stats'); statsDiv.innerHTML='';
   let labels=[], values=[];
-
   if(range==='m'){
     const monthly={};
     Object.entries(db).forEach(([d,val])=>{
-      const key=d.slice(0,7); // YYYY-MM
+      const key=d.slice(0,7);
       monthly[key]=(monthly[key]||0)+val;
     });
-    Object.keys(monthly).sort().slice(-12).forEach(key=>{
-      labels.push(new Date(key+'-01').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'}));
-      values.push(monthly[key]);
+    Object.keys(monthly).sort().slice(-12).forEach(k=>{
+      labels.push(new Date(k+'-01').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'}));
+      values.push(monthly[k]);
     });
   }else{
     const days=parseInt(range,10);
@@ -114,41 +134,23 @@ function renderRange(range){
       values.push(getDayTotal(key));
     }
   }
-
-  // Render chart
   const ctx=document.getElementById('statsChart').getContext('2d');
-  if(chartInstance){ chartInstance.destroy(); }
-  chartInstance=new Chart(ctx,{
-    type:'bar',
-    data:{ labels, datasets:[{ label:'Points', data:values }]},
-    options:{
-      responsive:true,
-      plugins:{ legend:{display:false}},
-      scales:{
-        x:{ ticks:{ color:'#d1d5db' }, grid:{ display:false } },
-        y:{ ticks:{ color:'#d1d5db' }, grid:{ color:'#374151' }, beginAtZero:true }
-      }
-    }
-  });
-
-  // Render list below
-  labels.forEach((label,i)=>addRow(label,values[i]));
-
-  function addRow(label,val){
+  if(chartInstance) chartInstance.destroy();
+  chartInstance=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data:values}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#d1d5db'},grid:{display:false}},y:{beginAtZero:true,ticks:{color:'#d1d5db'},grid:{color:'#374151'}}}}});
+  labels.forEach((lab,i)=>{
     const row=document.createElement('div');
     row.className='flex justify-between border-b border-gray-700 py-2';
-    row.innerHTML=`<span>${label}</span><span class='font-semibold text-emerald-400'>${val}</span>`;
+    row.innerHTML=`<span>${lab}</span><span class='font-semibold text-emerald-400'>${values[i]}</span>`;
     statsDiv.appendChild(row);
-  }
+  });
 }
 
-/******** INIT ********/ 
-document.getElementById('tabTasks').onclick=renderTasks;
-document.getElementById('tabStats').onclick=renderStats;
+document.getElementById('tabTasks').onclick = renderTasks;
+document.getElementById('tabStats').onclick = renderStats;
 renderTasks();
 
-/******** SW ********/ 
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(console.error);} 
+/******** Service‑worker (offline) ********/
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(console.error);
 </script>
 </body>
 </html>
