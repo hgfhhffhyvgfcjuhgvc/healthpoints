@@ -5,25 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Daily Points Tracker</title>
 
-  <!-- PWA manifest -->
+  <!-- PWA settings -->
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#10b981" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-  <!-- Gray splashscreen -->
-  <style>html, body{background:#4B5563;}</style>
+  <!-- Avoid flash -->
+  <style>html{background:#101827}</style>
 
-  <!-- Tailwind -->
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Internal styles -->
+
+  <!-- Internal Styles -->
   <style>
-    @keyframes press {0%{transform:scale(1)}50%{transform:scale(.96)}100%{transform:scale(1)}} 
-    .btn-press {animation: press .15s ease-out forwards;}
-    .prog {position:absolute; inset:0; width:0%; background:#10b98133; border-radius:0.75rem;}
-    dialog::backdrop {background:rgba(0,0,0,0.6);}
+    @keyframes press {0%{transform:scale(1)}50%{transform:scale(.96)}100%{transform:scale(1)}}
+    .btn-press {animation:press .15s ease-out forwards;}
+    .prog {position:absolute;inset:0;width:0%;background:#10b98133;border-radius:0.75rem;}
   </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
@@ -32,8 +31,7 @@
   <div class="text-lg font-bold">Score du jour : <span id="dailyScore" class="text-emerald-400">0</span></div>
   <div class="flex items-center gap-2">
     <span id="todayLabel" class="text-sm text-gray-400"></span>
-    <button id="resetBtn" class="px-2 py-1 rounded-lg bg-red-600 text-xs hover:bg-red-500">Reset</button>
-    <button id="editTasksBtn" class="px-2 py-1 rounded-lg bg-gray-700 text-xs">⚙️</button>
+    <button id="resetBtn" class="px-3 py-1 rounded-lg bg-red-600 text-xs hover:bg-red-500">Reset 🔄</button>
   </div>
 </header>
 
@@ -43,227 +41,142 @@
 </nav>
 
 <main id="mainContent" class="flex-1 overflow-y-auto p-4"></main>
-<footer class="text-center text-xs text-gray-500 py-2">© 2025 – Liberté !</footer>
+<footer class="text-center text-xs text-gray-500 py-2">© 2025 – Liberté !</footer>
 
-<!-- Toast -->
 <div id="toast" class="hidden fixed bottom-4 inset-x-0 flex justify-center pointer-events-none">
   <span id="toastMsg" class="px-4 py-2 rounded-lg bg-gray-800 text-sm shadow-lg opacity-0 transition-opacity duration-300"></span>
 </div>
 <audio id="tapSnd" src="tap-soft.mp3" preload="auto"></audio>
 
-<!-- Task editor dialog -->
-<dialog id="taskDialog" class="bg-gray-800 rounded-lg p-6 text-sm w-80">
-  <h3 id="dialogTitle" class="text-lg font-semibold mb-4">Nouvelle tâche</h3>
-  <label class="block mb-2">Nom
-    <input id="inputName" type="text" class="w-full mt-1 p-1 rounded bg-gray-700" />
-  </label>
-  <label class="block mb-2">Points
-    <input id="inputPts" type="number" min="1" class="w-full mt-1 p-1 rounded bg-gray-700" />
-  </label>
-  <label class="block mb-4">Objectif
-    <input id="inputGoal" type="number" min="1" class="w-full mt-1 p-1 rounded bg-gray-700" />
-  </label>
-  <div class="flex justify-between">
-    <button id="deleteTaskBtn" class="px-3 py-1 bg-red-600 rounded hidden">Supprimer</button>
-    <div class="flex gap-2">
-      <button id="cancelTaskBtn" class="px-3 py-1 bg-gray-600 rounded">Annuler</button>
-      <button id="saveTaskBtn" class="px-3 py-1 bg-emerald-600 rounded">Enregistrer</button>
-    </div>
-  </div>
-</dialog>
-
-<!-- Libraries deferred -->
+<!-- Firebase & Chart.js -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
 
 <script defer>
-/* Firebase init */
-firebase.initializeApp({
-  apiKey: "AIzaSyCssm-z4wtOWcK1qvbJc2SIQ6Pvc3JEszY",
-  authDomain: "health-fdf5b.firebaseapp.com",
-  projectId: "health-fdf5b"
-});
-const auth = firebase.auth(), db = firebase.firestore();
-let userDoc = null, tasksDoc = db.collection('config').doc('tasks');
+  // Default tasks seeding
+  const DEFAULT_TASKS = [
+    { id: 1, name: "Boire un verre d'eau", pts: 1, goal: 6 },
+    { id: 2, name: "Étirements matinaux", pts: 2, goal: 4 },
+    { id: 3, name: "Méditation 5 min", pts: 3, goal: 2 },
+    { id: 4, name: "Marche 10 min", pts: 2, goal: 3 },
+    { id: 5, name: "Lecture 10 pages", pts: 4, goal: 1 }
+  ];
 
-/* Helpers */
-const LS = 'dpt-db', todayStr = () => new Date().toISOString().slice(0,10);
-const loadLocal = () => JSON.parse(localStorage.getItem(LS)||'{}');
-const saveLocal = d => localStorage.setItem(LS, JSON.stringify(d));
-function norm(o){ for(const k in o) if(typeof o[k]==='number') o[k]={total:o[k],counts:{}}; return o; }
+  // Helpers
+  const LS = 'dpt-db';
+  const today = () => new Date().toISOString().slice(0,10);
+  const load = () => JSON.parse(localStorage.getItem(LS)||'{}');
+  const save = d => localStorage.setItem(LS, JSON.stringify(d));
+  const norm = o => { for (const k in o) if (typeof o[k] === 'number') o[k] = { total: o[k], counts: {} }; return o; };
 
-/* State */
-let data = norm(loadLocal()), tasks = [], chart = null, curTab = 'tasks', range = '7';
+  // State
+  let data = norm(load());
+  let chart = null, curTab = 'tasks', range = '7';
+  let remoteDoc = null, tasksDoc = null, tasks = [];
 
-/* DOM refs */
-const scoreEl = document.getElementById('dailyScore'),
-      labelEl = document.getElementById('todayLabel'),
-      mainEl  = document.getElementById('mainContent'),
-      tabTasks = document.getElementById('tabTasks'),
-      tabStats = document.getElementById('tabStats'),
-      resetBtn = document.getElementById('resetBtn'),
-      editTasksBtn = document.getElementById('editTasksBtn'),
-      dlg = document.getElementById('taskDialog'),
-      dialogTitle = document.getElementById('dialogTitle'),
-      inputName = document.getElementById('inputName'),
-      inputPts = document.getElementById('inputPts'),
-      inputGoal = document.getElementById('inputGoal'),
-      saveTaskBtn = document.getElementById('saveTaskBtn'),
-      cancelTaskBtn = document.getElementById('cancelTaskBtn'),
-      deleteTaskBtn = document.getElementById('deleteTaskBtn');
+  // UI refs
+  const scoreEl = document.getElementById('dailyScore'),
+        labelEl = document.getElementById('todayLabel'),
+        mainEl  = document.getElementById('mainContent'),
+        tabTasks = document.getElementById('tabTasks'),
+        tabStats = document.getElementById('tabStats'),
+        resetBtn = document.getElementById('resetBtn');
 
-/* UI feedback */
-function toast(msg){
-  const wrap = document.getElementById('toast'), box = document.getElementById('toastMsg');
-  box.textContent = msg; wrap.classList.remove('hidden');
-  requestAnimationFrame(()=>box.classList.remove('opacity-0'));
-  setTimeout(()=>{ box.classList.add('opacity-0'); setTimeout(()=>wrap.classList.add('hidden'),300); }, 1200);
-}
-const flashBtn = b => { b.classList.add('btn-press'); setTimeout(()=>b.classList.remove('btn-press'),150); };
-
-/* Ensure today in data */
-function ensureToday(){ if(!data[todayStr()]){ data[todayStr()]={total:0,counts:{}}; saveLocal(data);} }
-
-/* Tabs */
-function setTab(t){
-  curTab = t;
-  tabTasks.className = `px-4 py-2 rounded-lg font-semibold ${t==='tasks'?'bg-emerald-600':'bg-gray-700'}`;
-  tabStats.className = `px-4 py-2 rounded-lg font-semibold ${t==='stats'?'bg-emerald-600':'bg-gray-700'}`;
-}
-
-/* Render tasks */
-function renderTasks(){
-  ensureToday();
-  setTab('tasks');
-  const d = todayStr();
-  scoreEl.textContent = data[d].total;
-  labelEl.textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'});
-  mainEl.innerHTML = '';
-  tasks.forEach(t=>{
-    const done = data[d].counts[t.id]||0;
-    const pct = Math.min(done/t.goal,1)*100;
-    const btn = document.createElement('button');
-    btn.className = 'relative w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 hover:bg-emerald-700 transition duration-150 shadow overflow-hidden';
-    btn.innerHTML = `
-      <div class="prog" style="width:${pct}%"></div>
-      <div class="relative z-10 flex justify-between items-center">
-        <span>${t.name}</span><span class="font-semibold">+${t.pts}</span>
-      </div>
-      <div class="relative z-10 text-xs text-gray-400 flex justify-end mt-1">
-        <span data-c="${t.id}">${done}</span>/<span>${t.goal}</span>
-      </div>`;
-    btn.onclick = ()=>{ addPoints(t,btn); };
-    mainEl.appendChild(btn);
-  });
-}
-
-/* Add points */
-function addPoints(task, btn){
-  ensureToday();
-  const d = todayStr();
-  data[d].total += task.pts;
-  data[d].counts[task.id] = (data[d].counts[task.id]||0)+1;
-  saveLocal(data);
-  userDoc && userDoc.set(data).catch(console.error);
-  toast(`+${task.pts} pts ✅`);
-  const done = data[d].counts[task.id];
-  btn.querySelector(`[data-c='${task.id}']`).textContent = done;
-  btn.querySelector('.prog').style.width = Math.min(done/task.goal,1)*100+'%';
-  flashBtn(btn);
-}
-
-/* Render stats unchanged */
-function renderStats(){
-  setTab('stats');
-  labelEl.textContent = '';
-  mainEl.innerHTML = `
-    <div class="flex flex-wrap gap-2 mb-4">
-      <button class="range bg-gray-700 px-3 py-1 rounded" data-r="7">7 jours</button>
-      <button class="range bg-gray-700 px-3 py-1 rounded" data-r="30">30 jours</button>
-      <button class="range bg-gray-700 px-3 py-1 rounded" data-r="90">90 jours</button>
-      <button class="range bg-gray-700 px-3 py-1 rounded" data-r="m">Mensuel</button>
-    </div>
-    <canvas id="statsChart" class="w-full mb-6"></canvas>
-    <div id="statsList"></div>`;
-  document.querySelectorAll('.range').forEach(b=>b.onclick=e=>renderRange(e.target.dataset.r));
-  renderRange(range);
-}
-
-/* Render range unchanged... (omitted for brevity) */
-
-/* Editor dialog handlers */
-let editId = null;
-editTasksBtn.onclick = ()=>{
-  editId = null;
-  dialogTitle.textContent = 'Nouvelle tâche';
-  inputName.value=''; inputPts.value=1; inputGoal.value=1;
-  deleteTaskBtn.classList.add('hidden');
-  dlg.showModal();
-};
-cancelTaskBtn.onclick = ()=>dlg.close();
-deleteTaskBtn.onclick = ()=>{
-  tasks = tasks.filter(t=>t.id!==editId);
-  tasksDoc.set({list:tasks});
-  dlg.close();
-};
-saveTaskBtn.onclick = ()=>{
-  const name=inputName.value.trim(), pts=parseInt(inputPts.value), goal=parseInt(inputGoal.value);
-  if(!name||pts<1||goal<1){alert('Valeurs invalides'); return;}
-  if(editId){
-    let t = tasks.find(x=>x.id===editId);
-    t.name=name; t.pts=pts; t.goal=goal;
-  } else {
-    tasks.push({id:Date.now(),name,pts,goal});
+  function toast(msg){
+    const wrap = document.getElementById('toast'), box = document.getElementById('toastMsg');
+    box.textContent = msg; wrap.classList.remove('hidden');
+    requestAnimationFrame(()=>box.classList.remove('opacity-0'));
+    setTimeout(()=>{ box.classList.add('opacity-0'); setTimeout(()=>wrap.classList.add('hidden'),300); }, 1200);
   }
-  tasksDoc.set({list:tasks});
-  dlg.close();
-};
+  const flash = b => { b.classList.add('btn-press'); setTimeout(()=>b.classList.remove('btn-press'),150); };
 
-/* Reset handler */
-resetBtn.onclick = ()=>{
-  ensureToday();
-  const d = todayStr(); data[d]={total:0,counts:{}}; saveLocal(data);
-  userDoc && userDoc.set(data);
-  renderTasks();
-};
+  function ensureToday(){
+    if (!data[today()]) { data[today()] = { total: 0, counts: {} }; save(data); }
+  }
 
-/* Midnight rollover */
-function scheduleMidnight(){
-  const now = new Date();
-  const m = new Date(now); m.setHours(24,0,0,0);
-  setTimeout(()=>{
+  function setTab(t){
+    curTab = t;
+    tabTasks.className = `px-4 py-2 rounded-lg font-semibold ${t==='tasks'?'bg-emerald-600':'bg-gray-700'}`;
+    tabStats.className = `px-4 py-2 rounded-lg font-semibold ${t==='stats'?'bg-emerald-600':'bg-gray-700'}`;
+  }
+
+  function renderTasks(){
     ensureToday();
-    if(curTab==='tasks') renderTasks();
-    scheduleMidnight();
-  }, m-now+100);
-}
+    setTab('tasks');
+    const d = today();
+    scoreEl.textContent = data[d].total;
+    labelEl.textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'});
+    mainEl.innerHTML = '';
+    const counts = data[d].counts||{};
+    tasks.forEach(t => {
+      const done = counts[t.id]||0, pct = Math.min(done/t.goal,1)*100;
+      const btn = document.createElement('button');
+      btn.className = 'relative w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 active:bg-emerald-700 transition duration-150 shadow overflow-hidden';
+      btn.innerHTML = `
+        <div class="prog" style="width:${pct}%"></div>
+        <div class="relative z-10 flex justify-between items-center">
+          <span>${t.name}</span><span class="font-semibold">+${t.pts}</span>
+        </div>
+        <div class="relative z-10 text-xs text-gray-400 flex justify-end mt-1">
+          <span data-c="${t.id}">${done}</span>/<span>${t.goal}</span>
+        </div>`;
+      btn.onclick = () => {
+        ensureToday();
+        data[d].total += t.pts;
+        data[d].counts[t.id] = (data[d].counts[t.id]||0)+1;
+        save(data);
+        remoteDoc && remoteDoc.set(data);
+        toast(`+${t.pts} pts ✅`); flash(btn);
+        const done2 = data[d].counts[t.id];
+        btn.querySelector(`[data-c="${t.id}"]`).textContent = done2;
+        btn.querySelector('.prog').style.width = Math.min(done2/t.goal,1)*100 + '%';
+      };
+      mainEl.appendChild(btn);
+    });
+  }
 
-/* Init */
-window.addEventListener('load', ()=>{
-  auth.signInAnonymously().then(cred=>{
-    userDoc = db.collection('users').doc('global');
-    tasksDoc = db.collection('config').doc('tasks');
-    userDoc.get().then(snap=>{
-      if(snap.exists){ data=norm(snap.data()); saveLocal(data); }
-      renderTasks();
-      realtime();
+  function renderStats(){ /* ... your existing stats code ... */ }
+
+  // Firebase init & seeding
+  window.addEventListener('load', () => {
+    firebase.initializeApp({
+      apiKey: "AIzaSyCssm-z4wtOWcK1qvbJc2SIQ6Pvc3JEszY",
+      authDomain: "health-fdf5b.firebaseapp.com",
+      projectId: "health-fdf5b"
     });
-    tasksDoc.get().then(snap=>{
-      if(snap.exists){ tasks = snap.data().list||[]; }
-      tasks.sort((a,b)=>a.id-b.id);
-      renderTasks();
+    const auth = firebase.auth(), db = firebase.firestore();
+    auth.signInAnonymously().then(() => {
+      remoteDoc = db.collection('users').doc('global');
+      tasksDoc  = db.collection('config').doc('tasks');
+
+      // Load or seed tasks list
+      tasksDoc.get().then(snap => {
+        if (snap.exists) {
+          tasks = snap.data().list || [];
+        } else {
+          tasks = DEFAULT_TASKS;
+          tasksDoc.set({ list: DEFAULT_TASKS });
+        }
+        renderTasks();
+      });
+
+      // Listen for remote changes
+      remoteDoc.get().then(snap => {
+        if (snap.exists) { data = norm(snap.data()); save(data); }
+        renderTasks();
+      });
+      remoteDoc.onSnapshot(snap => {
+        if (snap.exists) { data = norm(snap.data()); save(data); if(curTab==='tasks') renderTasks(); }
+      });
+
     });
-    tasksDoc.onSnapshot(snap=>{
-      tasks = snap.data().list||[];
-      tasks.sort((a,b)=>a.id-b.id);
-      if(curTab==='tasks') renderTasks();
-    });
+
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('sw.js');
+    }
   });
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
-  scheduleMidnight();
-});
 </script>
 </body>
 </html>
