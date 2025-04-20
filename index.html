@@ -27,15 +27,19 @@
     /* objets prêts pour la synchronisation (prochaine étape) */
     const auth     = firebase.auth();
     const dbRemote = firebase.firestore();
-// --- Connexion anonyme ---
-let uid;
+let remoteDocRef;   // référence Firestore (sera initialisée après login)
+
+// --- Connexion anonyme + création de la référence ---
+let uid, remoteDocRef;
 auth.signInAnonymously()
     .then(cred => {
       uid = cred.user.uid;
+      remoteDocRef = dbRemote.collection('users').doc(uid);
       console.log('Connecté à Firebase, UID =', uid);
     })
     .catch(console.error);
-// -------------------------
+// ----------------------------------------------------
+
 
   </script>
 
@@ -72,10 +76,13 @@ const todayStr = () => new Date().toISOString().slice(0,10);
 const loadData = () => JSON.parse(localStorage.getItem(LS_KEY)||'{}');
 const saveData = db => localStorage.setItem(LS_KEY, JSON.stringify(db));
 const getDayTotal = d => loadData()[d] || 0;
-function addPoints(d, pts){
+function addPoints(date, pts){
   const db = loadData();
-  db[d] = getDayTotal(d) + pts;
-  saveData(db);            // (sync distant à venir)
+  db[date] = getDayTotal(date) + pts;
+  saveData(db);
+
+  // --- push Cloud ---
+  if (remoteDocRef) remoteDocRef.set(db).catch(console.error);
 }
 
 /******** UI ********/
