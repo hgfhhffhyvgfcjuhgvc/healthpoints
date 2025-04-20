@@ -5,45 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Daily Points Tracker</title>
 
-  <!-- Tailwind & chart.js -->
+  <!-- Tailwind & Chart.js -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Firebase SDK -->
+  <!-- Firebase SDKs (compat → plus simples) -->
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyCssm-z4wtOWcK1qvbJc2SIQ6Pvc3JEszY",
-      authDomain: "health-fdf5b.firebaseapp.com",
-      projectId: "health-fdf5b",
-      storageBucket: "health-fdf5b.appspot.com",
-      messagingSenderId: "304202917649",
-      appId: "1:304202917649:web:23d6ead24ddb2033378eb0",
-      measurementId: "G-G15TPJPXKN"
-    };
-    firebase.initializeApp(firebaseConfig);
-    /* objets prêts pour la synchronisation (prochaine étape) */
-    const auth     = firebase.auth();
-    const dbRemote = firebase.firestore();
-let remoteDocRef;   // référence Firestore (sera initialisée après login)
 
-// --- Connexion anonyme + création de la référence ---
-let uid;
-auth.signInAnonymously()
-    .then(cred => {
-      uid = cred.user.uid;
-      remoteDocRef = dbRemote.collection('users').doc(uid);
-      window.remoteDocRef = remoteDocRef;
-      console.log('Connecté à Firebase, UID =', uid);
-    })
-    .catch(console.error);
-// ----------------------------------------------------
-
-
-  </script>
-
+  <!-- PWA manifest -->
   <link rel="manifest" href="manifest.webmanifest" />
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
@@ -59,10 +30,27 @@ auth.signInAnonymously()
   </nav>
 
   <main id="mainContent" class="flex-1 overflow-y-auto p-4"></main>
-  <footer class="text-center text-xs text-gray-500 py-2">© 2025 – Liberté & motivations !</footer>
+  <footer class="text-center text-xs text-gray-500 py-2">© 2025 – Liberté & motivations !</footer>
 
 <script>
-/******** CONFIG ********/
+/******** 1. FIREBASE INIT + AUTH ANONYME ********/
+const firebaseConfig = {
+  apiKey: "AIzaSyCssm-z4wtOWcK1qvbJc2SIQ6Pvc3JEszY",
+  authDomain: "health-fdf5b.firebaseapp.com",
+  projectId: "health-fdf5b",
+  storageBucket: "health-fdf5b.appspot.com",
+  messagingSenderId: "304202917649",
+  appId: "1:304202917649:web:23d6ead24ddb2033378eb0",
+  measurementId: "G-G15TPJPXKN"
+};
+firebase.initializeApp(firebaseConfig);
+const auth     = firebase.auth();
+const dbRemote = firebase.firestore();
+let remoteDocRef;           // référence Firestore globale
+let uid;                    // identifiant utilisateur
+
+/******** 2. DONNÉES LOCALES CONFIG ********/
+const LS_KEY = 'dpt-db';
 const TASKS = [
   { id: 1, name: "Boire un verre d'eau", pts: 1 },
   { id: 2, name: "Étirements matinaux", pts: 2 },
@@ -70,23 +58,12 @@ const TASKS = [
   { id: 4, name: "Marche 10 min", pts: 2 },
   { id: 5, name: "Lecture 10 pages", pts: 4 }
 ];
-const LS_KEY = 'dpt-db';
-
-/******** HELPERS ********/
 const todayStr = () => new Date().toISOString().slice(0,10);
 const loadData = () => JSON.parse(localStorage.getItem(LS_KEY)||'{}');
 const saveData = db => localStorage.setItem(LS_KEY, JSON.stringify(db));
 const getDayTotal = d => loadData()[d] || 0;
-function addPoints(date, pts){
-  const db = loadData();
-  db[date] = getDayTotal(date) + pts;
-  saveData(db);
 
-  // --- push Cloud ---
-  if (remoteDocRef) remoteDocRef.set(db).catch(console.error);
-}
-
-/******** UI ********/
+/******** 3. UI ÉLÉMENTS ********/
 const scoreEl = document.getElementById('dailyScore');
 const labelEl = document.getElementById('todayLabel');
 const main    = document.getElementById('mainContent');
@@ -135,40 +112,35 @@ function renderRange(range){
   let labels=[], values=[];
   if(range==='m'){
     const monthly={};
-    Object.entries(db).forEach(([d,val])=>{
-      const key=d.slice(0,7);
-      monthly[key]=(monthly[key]||0)+val;
-    });
-    Object.keys(monthly).sort().slice(-12).forEach(k=>{
-      labels.push(new Date(k+'-01').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'}));
-      values.push(monthly[k]);
-    });
+    Object.entries(db).forEach(([d,val])=>{ const key=d.slice(0,7); monthly[key]=(monthly[key]||0)+val; });
+    Object.keys(monthly).sort().slice(-12).forEach(k=>{ labels.push(new Date(k+'-01').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'})); values.push(monthly[k]); });
   }else{
     const days=parseInt(range,10);
-    for(let i=days-1;i>=0;i--){
-      const d=new Date(); d.setDate(d.getDate()-i);
-      const key=d.toISOString().slice(0,10);
-      labels.push(d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'}));
-      values.push(getDayTotal(key));
-    }
+    for(let i=days-1;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); const key=d.toISOString().slice(0,10); labels.push(d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'})); values.push(getDayTotal(key)); }
   }
   const ctx=document.getElementById('statsChart').getContext('2d');
   if(chartInstance) chartInstance.destroy();
   chartInstance=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data:values}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#d1d5db'},grid:{display:false}},y:{beginAtZero:true,ticks:{color:'#d1d5db'},grid:{color:'#374151'}}}}});
-  labels.forEach((lab,i)=>{
-    const row=document.createElement('div');
-    row.className='flex justify-between border-b border-gray-700 py-2';
-    row.innerHTML=`<span>${lab}</span><span class='font-semibold text-emerald-400'>${values[i]}</span>`;
-    statsDiv.appendChild(row);
+  labels.forEach((lab,i)=>{ const row=document.createElement('div'); row.className='flex justify-between border-b border-gray-700 py-2'; row.innerHTML=`<span>${lab}</span><span class='font-semibold text-emerald-400'>${values[i]}</span>`; statsDiv.appendChild(row); });
+}
+
+/******** 4. SAUVEGARDE & SYNC ********/
+function addPoints(date, pts){
+  const db = loadData();
+  db[date] = getDayTotal(date) + pts;
+  saveData(db);
+  if (remoteDocRef) remoteDocRef.set(db).catch(console.error);
+}
+
+function startRealtimeSync(){
+  remoteDocRef.onSnapshot(snap=>{
+    if(!snap.exists()) return;
+    localStorage.setItem(LS_KEY, JSON.stringify(snap.data()));
+    scoreEl.textContent = getDayTotal(todayStr());
+    if(currentTab==='stats') renderRange(currentRange);
   });
 }
 
-document.getElementById('tabTasks').onclick = renderTasks;
-document.getElementById('tabStats').onclick = renderStats;
-renderTasks();
-
-/******** Service‑worker (offline) ********/
-if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(console.error);
-</script>
-</body>
-</html>
+/******** 5. AUTH + CHARGEMENT INITIAL ********/
+auth.signInAnonymously()
+  .then(cred=>{
