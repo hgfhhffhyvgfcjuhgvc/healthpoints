@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+<style>
+@keyframes press {
+  0%   { transform: scale(1);   }
+  50%  { transform: scale(.96); }
+  100% { transform: scale(1);   }
+}
+.btn-press {
+  animation: press 150ms ease-out forwards;
+}
+</style>
+
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Daily Points Tracker</title>
