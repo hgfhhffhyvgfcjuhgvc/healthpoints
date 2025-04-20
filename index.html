@@ -35,6 +35,7 @@ auth.signInAnonymously()
     .then(cred => {
       uid = cred.user.uid;
       remoteDocRef = dbRemote.collection('users').doc(uid);
+      window.remoteDocRef = remoteDocRef;
       console.log('Connecté à Firebase, UID =', uid);
     })
     .catch(console.error);
