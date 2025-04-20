@@ -17,7 +17,6 @@
   <link rel="manifest" href="manifest.webmanifest" />
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
-
   <!-- HEADER -->
   <header class="p-4 bg-gray-800 shadow flex items-center justify-between">
     <div class="text-lg font-bold">Score du jour : <span id="dailyScore" class="text-emerald-400">0</span></div>
@@ -115,12 +114,17 @@ function renderRange(r){
   currentRange = r;
   const dbData = loadData(), labels=[], values=[];
   if(r === 'm'){
+    /* ---- 12 derniers mois, même si 0 ---- */
     const monthly={};
     for(const [d,v] of Object.entries(dbData)){ const k=d.slice(0,7); monthly[k]=(monthly[k]||0)+v; }
-    Object.keys(monthly).sort().slice(-12).forEach(k=>{
-      labels.push(new Date(k+'-01').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'}));
-      values.push(monthly[k]);
-    });
+
+    const base=new Date(); base.setDate(1);      // 1er du mois courant
+    for(let i=11;i>=0;i--){                      // 11 → 0
+      const d=new Date(base); d.setMonth(d.getMonth()-i);
+      const key=d.toISOString().slice(0,7);      // YYYY-MM
+      labels.push(d.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'}));
+      values.push(monthly[key]||0);
+    }
   }else{
     const n=parseInt(r,10);
     for(let i=n-1;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i);
