@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Daily Points Tracker</title>
 
-  <!-- Tailwind & Chart.js -->
+  <!-- Tailwind + Chart.js -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Firebase (compat SDKs) -->
+  <!-- Firebase compat -->
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
@@ -28,51 +28,52 @@
   </nav>
 
   <main id="mainContent" class="flex-1 overflow-y-auto p-4"></main>
-  <footer class="text-center text-xs text-gray-500 py-2">© 2025 – Liberté & motivations !</footer>
+  <footer class="text-center text-xs text-gray-500 py-2">© 2025 – Liberté !</footer>
 
 <script>
-/***** 1. Firebase init *****/
-const firebaseConfig = {
+/* ---------- 1. FIREBASE ---------- */
+firebase.initializeApp({
   apiKey: "AIzaSyCssm-z4wtOWcK1qvbJc2SIQ6Pvc3JEszY",
   authDomain: "health-fdf5b.firebaseapp.com",
-  projectId: "health-fdf5b",
-  storageBucket: "health-fdf5b.appspot.com",
-  messagingSenderId: "304202917649",
-  appId: "1:304202917649:web:23d6ead24ddb2033378eb0"
-};
-firebase.initializeApp(firebaseConfig);
+  projectId: "health-fdf5b"
+});
 const auth = firebase.auth();
 const db   = firebase.firestore();
 let remoteDocRef, uid;
 
-/***** 2. Local storage helpers *****/
+/* ---------- 2. LOCAL STORAGE ---------- */
 const LS_KEY = 'dpt-db';
 const todayStr = () => new Date().toISOString().slice(0,10);
 const loadData = () => JSON.parse(localStorage.getItem(LS_KEY)||'{}');
 const saveData = d => localStorage.setItem(LS_KEY, JSON.stringify(d));
-const getDayTotal = d => loadData()[d] || 0;
+const getDayTotal = d => loadData()[d]||0;
 
-/***** 3. Tasks *****/
+/* ---------- 3. TASKS CONFIG ---------- */
 const TASKS = [
   {id:1,name:"Boire un verre d'eau",pts:1},
   {id:2,name:"Étirements matinaux",pts:2},
-  {id:3,name:"Méditation 5 min",pts:3},
-  {id:4,name:"Marche 10 min",pts:2},
-  {id:5,name:"Lecture 10 pages",pts:4}
+  {id:3,name:"Méditation 5 min",pts:3},
+  {id:4,name:"Marche 10 min",pts:2},
+  {id:5,name:"Lecture 10 pages",pts:4}
 ];
 
-/***** 4. UI refs *****/
+/* ---------- 4. UI REFS ---------- */
 const scoreEl=document.getElementById('dailyScore');
 const labelEl=document.getElementById('todayLabel');
 const main   =document.getElementById('mainContent');
+const tabTasks=document.getElementById('tabTasks');
+const tabStats=document.getElementById('tabStats');
 let chartInstance=null,currentTab='tasks',currentRange='7';
 
-/***** 5. Rendering functions *****/
+/* ---------- 5. RENDERERS ---------- */
 function setActive(tab){
   currentTab=tab;
-  tab==='tasks' ? (tabTasks.classList.replace('bg-gray-700','bg-emerald-600'), tabStats.classList.replace('bg-emerald-600','bg-gray-700'))
-                : (tabStats.classList.replace('bg-gray-700','bg-emerald-600'), tabTasks.classList.replace('bg-emerald-600','bg-gray-700'));
+  tabTasks.classList.toggle('bg-emerald-600',tab==='tasks');
+  tabTasks.classList.toggle('bg-gray-700',  tab!=='tasks');
+  tabStats.classList.toggle('bg-emerald-600',tab==='stats');
+  tabStats.classList.toggle('bg-gray-700',  tab!=='stats');
 }
+
 function renderTasks(){
   setActive('tasks');
   const today=todayStr();
@@ -83,17 +84,18 @@ function renderTasks(){
     const btn=document.createElement('button');
     btn.className='w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 hover:bg-emerald-700 shadow';
     btn.innerHTML=`${t.name}<span class='float-right font-semibold'>+${t.pts}</span>`;
-    btn.onclick=()=>{addPoints(today,t.pts);scoreEl.textContent=getDayTotal(today);} ;
+    btn.onclick=()=>{ addPoints(today,t.pts); scoreEl.textContent=getDayTotal(today); };
     main.appendChild(btn);
   });
 }
+
 function renderStats(){
   setActive('stats');
   labelEl.textContent='';
   main.innerHTML=`<div class='flex flex-wrap gap-2 mb-4'>
     <button class='range bg-gray-700 px-3 py-1 rounded' data-r='7'>7 jours</button>
-    <button class='range bg-gray-700 px-3 py-1 rounded' data-r='30'>30 jours</button>
-    <button class='range bg-gray-700 px-3 py-1 rounded' data-r='90'>90 jours</button>
+    <button class='range bg-gray-700 px-3 py-1 rounded' data-r='30'>30 jours</button>
+    <button class='range bg-gray-700 px-3 py-1 rounded' data-r='90'>90 jours</button>
     <button class='range bg-gray-700 px-3 py-1 rounded' data-r='m'>Mensuel</button>
   </div>
   <canvas id='statsChart' class='w-full mb-6'></canvas>
@@ -101,23 +103,33 @@ function renderStats(){
   document.querySelectorAll('.range').forEach(b=>b.onclick=e=>renderRange(e.target.dataset.r));
   renderRange(currentRange);
 }
+
 function renderRange(r){
   currentRange=r;
-  const dbData=loadData();
-  const labels=[],values=[];
-  if(r==='m'){
+  const dbData=loadData(), labels=[], values=[];
+  if(r==='m'){   // 12 derniers mois
     const monthly={};
-    for(const [d,v] of Object.entries(dbData)){const key=d.slice(0,7);monthly[key]=(monthly[key]||0)+v;}
-    Object.keys(monthly).sort().slice(-12).forEach(k=>{labels.push(new Date(k+'-01').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'}));values.push(monthly[k]);});
+    for(const [d,v] of Object.entries(dbData)){ const k=d.slice(0,7); monthly[k]=(monthly[k]||0)+v; }
+    Object.keys(monthly).sort().slice(-12).forEach(k=>{
+      labels.push(new Date(k+'-01').toLocaleDateString('fr-FR',{month:'short',year:'2-digit'}));
+      values.push(monthly[k]);
+    });
   }else{
     const n=parseInt(r,10);
-    for(let i=n-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const key=d.toISOString().slice(0,10);labels.push(d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'}));values.push(dbData[key]||0);} }
+    for(let i=n-1;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i);
+      const k=d.toISOString().slice(0,10);
+      labels.push(d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'}));
+      values.push(dbData[k]||0);
+    }
+  }
   const ctx=document.getElementById('statsChart').getContext('2d');
   chartInstance&&chartInstance.destroy();
   chartInstance=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data:values}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#d1d5db'},grid:{display:false}},y:{beginAtZero:true,ticks:{color:'#d1d5db'},grid:{color:'#374151'}}}}});
-  const list=document.getElementById('stats');list.innerHTML='';labels.forEach((l,i)=>{const div=document.createElement('div');div.className='flex justify-between border-b border-gray-700 py-2';div.innerHTML=`<span>${l}</span><span class='font-semibold text-emerald-400'>${values[i]}</span>`;list.appendChild(div);});
+  const list=document.getElementById('stats'); list.innerHTML='';
+  labels.forEach((l,i)=>{ const row=document.createElement('div'); row.className='flex justify-between border-b border-gray-700 py-2'; row.innerHTML=`<span>${l}</span><span class='font-semibold text-emerald-400'>${values[i]}</span>`; list.appendChild(row); });
 }
-/***** 6. Data sync *****/
+
+/* ---------- 6. SYNC ---------- */
 function addPoints(d,pts){
   const dbData=loadData();
   dbData[d]=(dbData[d]||0)+pts;
@@ -132,20 +144,27 @@ function startRealtimeSync(){
     if(currentTab==='stats')renderRange(currentRange);
   });
 }
-/***** 7. Init after auth *****/
+
+/* ---------- 7. INIT ---------- */
 function initUI(){
   tabTasks.onclick=renderTasks;
   tabStats.onclick=renderStats;
   renderTasks();
 }
-// buttons refs created after DOM load
-const tabTasks=document.getElementById('tabTasks');
-const tabStats=document.getElementById('tabStats');
 
 auth.signInAnonymously().then(cred=>{
   uid=cred.user.uid;
   remoteDocRef=db.collection('users').doc(uid);
-  window.remoteDocRef=remoteDocRef;
-  // load first data then init UI
+  window.remoteDocRef=remoteDocRef;          // pour debug console
   remoteDocRef.get().then(snap=>{
-    if(snap.exists())localStorage.setItem(LS
+    if(snap.exists()) localStorage.setItem(LS_KEY, JSON.stringify(snap.data()));
+    initUI();
+    startRealtimeSync();
+  }).catch(err=>{ console.error(err); initUI(); });
+}).catch(console.error);
+
+/* PWA offline */
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(console.error);
+</script>
+</body>
+</html>
