@@ -1,17 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<style>
-@keyframes press {
-  0%   { transform: scale(1);   }
-  50%  { transform: scale(.96); }
-  100% { transform: scale(1);   }
-}
-.btn-press {
-  animation: press 150ms ease-out forwards;
-}
-</style>
-
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Daily Points Tracker</title>
@@ -24,6 +13,12 @@
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+
+  <!-- Petite animation bouton -->
+  <style>
+    @keyframes press { 0%{transform:scale(1)}50%{transform:scale(.96)}100%{transform:scale(1)} }
+    .btn-press{ animation:press .15s ease-out forwards; }
+  </style>
 
   <link rel="manifest" href="manifest.webmanifest" />
 </head>
@@ -44,109 +39,79 @@
   </nav>
 
   <main id="mainContent" class="flex-1 overflow-y-auto p-4"></main>
-<audio id="tapSnd" src="tap-soft.mp3" preload="auto"></audio>
-  <footer class="text-center text-xs text-gray-500 py-2">© 2025 – Liberté !</footer>
+  <footer class="text-center text-xs text-gray-500 py-2">© 2025 – Liberté !</footer>
 
   <!-- Toast -->
   <div id="toast" class="hidden fixed bottom-4 inset-x-0 flex justify-center pointer-events-none">
     <span id="toastMsg" class="px-4 py-2 rounded-lg bg-gray-800 text-sm shadow-lg opacity-0 transition-opacity duration-300"></span>
   </div>
 
+  <!-- Click sound -->
+  <audio id="tapSnd" src="tap-soft.mp3" preload="auto"></audio>
+
 <script>
-/***** Firebase *****/
+/* === Firebase init === */
 firebase.initializeApp({ apiKey:"AIzaSyCssm-z4wtOWcK1qvbJc2SIQ6Pvc3JEszY", authDomain:"health-fdf5b.firebaseapp.com", projectId:"health-fdf5b" });
-const auth=firebase.auth(); const db=firebase.firestore();
+const auth=firebase.auth(), db=firebase.firestore();
 let remoteDocRef;
 
-/***** Helpers *****/
-const LS_KEY='dpt-db';
-const todayStr=()=>new Date().toISOString().slice(0,10);
-const loadData=()=>JSON.parse(localStorage.getItem(LS_KEY)||'{}');
-const saveData=d=>localStorage.setItem(LS_KEY,JSON.stringify(d));
-const getDayTotal=d=>loadData()[d]||0;
+/* === helpers === */
+const LS='dpt-db', today=()=>new Date().toISOString().slice(0,10);
+const load=()=>JSON.parse(localStorage.getItem(LS)||'{}');
+const save=d=>localStorage.setItem(LS,JSON.stringify(d));
+const total=d=>load()[d]||0;
 
-/***** Toast *****/
-function showToast(msg){
-  const toast=document.getElementById('toast');
-  const box=document.getElementById('toastMsg');
-  box.textContent=msg;
-  toast.classList.remove('hidden');
-  requestAnimationFrame(()=>box.classList.remove('opacity-0'));
-  setTimeout(()=>{ box.classList.add('opacity-0'); setTimeout(()=>toast.classList.add('hidden'),300); },1200);
+/* === toast === */
+function toast(msg){
+  const t=document.getElementById('toast'), m=document.getElementById('toastMsg');
+  m.textContent=msg; t.classList.remove('hidden'); requestAnimationFrame(()=>m.classList.remove('opacity-0'));
+  setTimeout(()=>{m.classList.add('opacity-0'); setTimeout(()=>t.classList.add('hidden'),300);},1200);
 }
 
-/***** Flash bouton *****/
-function flash(btn){
-  btn.classList.remove('bg-gray-800');
-  btn.classList.add('bg-emerald-700');
-  setTimeout(()=>{ btn.classList.add('bg-gray-800'); btn.classList.remove('bg-emerald-700'); },400);
-}
+/* === btn flash === */
+function flash(btn){ btn.classList.add('btn-press'); setTimeout(()=>btn.classList.remove('btn-press'),150); }
 
-/***** Tasks *****/
-const TASKS=[
-  {id:1,name:"Boire un verre d'eau",pts:1},
-  {id:2,name:"Étirements matinaux",pts:2},
-  {id:3,name:"Méditation 5 min",pts:3},
-  {id:4,name:"Marche 10 min",pts:2},
-  {id:5,name:"Lecture 10 pages",pts:4}
-];
+/* === tasks list === */
+const TASKS=[{id:1,name:"Boire un verre d'eau",pts:1},{id:2,name:"Étirements matinaux",pts:2},{id:3,name:"Méditation 5 min",pts:3},{id:4,name:"Marche 10 min",pts:2},{id:5,name:"Lecture 10 pages",pts:4}];
 
-/***** UI refs *****/
-const scoreEl=document.getElementById('dailyScore');
-const labelEl=document.getElementById('todayLabel');
-const main=document.getElementById('mainContent');
-const tabTasks=document.getElementById('tabTasks');
-const tabStats=document.getElementById('tabStats');
-const resetBtn=document.getElementById('resetBtn');
-let chartInstance=null,currentTab='tasks',currentRange='7';
+/* === UI refs === */
+const score=document.getElementById('dailyScore'), lbl=document.getElementById('todayLabel'), main=document.getElementById('mainContent');
+const tabT=document.getElementById('tabTasks'), tabS=document.getElementById('tabStats'), reset=document.getElementById('resetBtn'), snd=document.getElementById('tapSnd');
+let chart=null, curTab='tasks', range='7';
 
-/***** Renderers (modif légère dans renderTasks) *****/
-function setActive(tab){
-  currentTab=tab;
-  tabTasks.classList.toggle('bg-emerald-600',tab==='tasks'); tabTasks.classList.toggle('bg-gray-700',tab!=='tasks');
-  tabStats.classList.toggle('bg-emerald-600',tab==='stats'); tabStats.classList.toggle('bg-gray-700',tab!=='stats');
-}
+/* === renderers === */
+function active(tab){ curTab=tab; tabT.classList.toggle('bg-emerald-600',tab==='tasks');tabT.classList.toggle('bg-gray-700',tab!=='tasks');tabS.classList.toggle('bg-emerald-600',tab==='stats');tabS.classList.toggle('bg-gray-700',tab!=='stats'); }
 function renderTasks(){
-  setActive('tasks');
-  const today=todayStr();
-  scoreEl.textContent=getDayTotal(today);
-  labelEl.textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'});
-  main.innerHTML='';
-  TASKS.forEach(t=>{
-    const btn=document.createElement('button');
-    btn.className='w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 active:bg-emerald-700 transition-colors duration-500 shadow';
-    btn.innerHTML=`${t.name}<span class='float-right font-semibold'>+${t.pts}</span>`;
-    btn.onclick = () => {
-  addPoints(today, t.pts);
-  scoreEl.textContent = getDayTotal(today);
-  showToast(`+${t.pts} pts ✅`);
-
-  /* >>> feedback audio + anim */
-  const snd = document.getElementById('tapSnd');
-  if (snd) { snd.currentTime = 0; snd.play().catch(()=>{}); }
-
-  btn.classList.add('btn-press');
-  setTimeout(() => btn.classList.remove('btn-press'), 150);
-};
-
-    main.appendChild(btn);
-  });
+  active('tasks'); const d=today(); score.textContent=total(d); lbl.textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short'});
+  main.innerHTML=''; TASKS.forEach(t=>{ const b=document.createElement('button');
+    b.className='w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 active:bg-emerald-700 transition-colors duration-150 shadow';
+    b.innerHTML=`${t.name}<span class='float-right font-semibold'>+${t.pts}</span>`;
+    b.onclick=()=>{ addPts(d,t.pts); score.textContent=total(d); toast(`+${t.pts} pts ✅`); flash(b); if(snd){snd.currentTime=0; snd.play().catch(()=>{});} };
+    main.appendChild(b);});
 }
-function renderStats(){ /* inchangé */ }
-function renderRange(r){ /* inchangé */ }
+function renderStats(){ active('stats'); lbl.textContent=''; main.innerHTML=`<div class='flex flex-wrap gap-2 mb-4'>
+  <button class='r bg-gray-700 px-3 py-1 rounded' data-r='7'>7 jours</button>
+  <button class='r bg-gray-700 px-3 py-1 rounded' data-r='30'>30 jours</button>
+  <button class='r bg-gray-700 px-3 py-1 rounded' data-r='90'>90 jours</button>
+  <button class='r bg-gray-700 px-3 py-1 rounded' data-r='m'>Mensuel</button></div>
+  <canvas id='c' class='w-full mb-6'></canvas><div id='list'></div>`;
+  document.querySelectorAll('.r').forEach(b=>b.onclick=e=>renderRange(e.target.dataset.r)); renderRange(range);}
+function renderRange(r){
+  range=r; const db=load(), lab=[], val=[]; if(r==='m'){const mon={};Object.entries(db).forEach(([d,v])=>{const k=d.slice(0,7);mon[k]=(mon[k]||0)+v;});const base=new Date();base.setDate(1);for(let i=11;i>=0;i--){const d=new Date(base);d.setMonth(d.getMonth()-i);const k=d.toISOString().slice(0,7);lab.push(d.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'}));val.push(mon[k]||0);} }else{const n=parseInt(r);for(let i=n-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const k=d.toISOString().slice(0,10);lab.push(d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'}));val.push(db[k]||0);}}
+  if(chart){chart.destroy();} chart=new Chart(document.getElementById('c').getContext('2d'),{type:'bar',data:{labels:lab,datasets:[{data:val}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#d1d5db'},grid:{display:false}},y:{beginAtZero:true,ticks:{color:'#d1d5db'},grid:{color:'#374151'}}}}});
+  const list=document.getElementById('list'); list.innerHTML=''; for(let i=lab.length-1;i>=0;i--){const row=document.createElement('div');row.className='flex justify-between border-b border-gray-700 py-2';row.innerHTML=`<span>${lab[i]}</span><span class='font-semibold text-emerald-400'>${val[i]}</span>`;list.appendChild(row);}}
 
-/***** Sync & Reset *****/
-function addPoints(d,pts){ const dbData=loadData(); dbData[d]=(dbData[d]||0)+pts; saveData(dbData); remoteDocRef&&remoteDocRef.set(dbData).catch(console.error); }
-function resetToday(){ const d=todayStr(); const dbData=loadData(); dbData[d]=0; saveData(dbData); remoteDocRef&&remoteDocRef.set(dbData).catch(console.error); scoreEl.textContent='0'; if(currentTab==='stats')renderRange(currentRange); showToast('Score remis à 0'); }
-function startRealtimeSync(){ /* inchangé */ }
+/* === sync === */
+function addPts(d,p){const db=load();db[d]=(db[d]||0)+p;save(db);remoteDocRef&&remoteDocRef.set(db).catch(console.error);}
+function resetDay(){const d=today();const db=load();db[d]=0;save(db);remoteDocRef&&remoteDocRef.set(db).catch(console.error);score.textContent='0';if(curTab==='stats')renderRange(range);toast('Score remis à 0');}
+function realtime(){remoteDocRef.onSnapshot(s=>{if(!s.exists)return;localStorage.setItem(LS,JSON.stringify(s.data()));score.textContent=total(today());if(curTab==='stats')renderRange(range);});}
 
-/***** Init *****/
-function initUI(){ tabTasks.onclick=renderTasks; tabStats.onclick=renderStats; resetBtn.onclick=resetToday; renderTasks(); }
+/* === init === */
+function init(){tabT.onclick=renderTasks;tabS.onclick=renderStats;reset.onclick=resetDay;renderTasks();}
+auth.signInAnonymously().then(()=>{remoteDocRef=db.collection('users').doc('global');remoteDocRef.get().then(s=>{if(s.exists)localStorage.setItem(LS,JSON.stringify(s.data()));init();realtime();}).catch(e=>{console.error(e);init();});}).catch(console.error);
 
-auth.signInAnonymously().then(()=>{ remoteDocRef=db.collection('users').doc('global'); remoteDocRef.get().then(snap=>{ if(snap.exists) localStorage.setItem(LS_KEY,JSON.stringify(snap.data())); initUI(); startRealtimeSync(); }).catch(err=>{console.error(err); initUI();}); }).catch(console.error);
-
-/***** PWA offline *****/
-if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw-v2.js').catch(console.error); }
+/* sw */
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw-v2.js').catch(console.error);}
 </script>
 </body>
 </html>
