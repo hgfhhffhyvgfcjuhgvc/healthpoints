@@ -154,7 +154,7 @@ function initUI(){
 
 auth.signInAnonymously().then(cred=>{
   uid=cred.user.uid;
-  remoteDocRef=db.collection('users').doc(uid);
+  remoteDocRef = db.collection('users').doc('global');
   window.remoteDocRef=remoteDocRef;          // pour debug console
   remoteDocRef.get().then(snap=>{
     if(snap.exists()) localStorage.setItem(LS_KEY, JSON.stringify(snap.data()));
