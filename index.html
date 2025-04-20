@@ -9,7 +9,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Firebase (compat) -->
+  <!-- Firebase compat -->
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
@@ -17,18 +17,16 @@
   <link rel="manifest" href="manifest.webmanifest" />
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
-  <!-- ===== Header ===== -->
+  <!-- Header -->
   <header class="p-4 bg-gray-800 shadow flex items-center justify-between">
-    <div class="text-lg font-bold">
-      Score du jour : <span id="dailyScore" class="text-emerald-400">0</span>
-    </div>
+    <div class="text-lg font-bold">Score du jour : <span id="dailyScore" class="text-emerald-400">0</span></div>
     <div class="flex items-center gap-2">
       <span id="todayLabel" class="text-sm text-gray-400"></span>
       <button id="resetBtn" class="px-3 py-1 rounded-lg bg-red-600 text-xs hover:bg-red-500">Reset 🔄</button>
     </div>
   </header>
 
-  <!-- ===== Tabs ===== -->
+  <!-- Tabs -->
   <nav class="flex justify-center gap-4 my-3">
     <button id="tabTasks" class="px-4 py-2 rounded-lg bg-emerald-600 font-semibold">Tâches</button>
     <button id="tabStats" class="px-4 py-2 rounded-lg bg-gray-700 font-semibold">Statistiques</button>
@@ -43,33 +41,36 @@
   </div>
 
 <script>
-/***** 1. Firebase *****/
+/***** Firebase *****/
 firebase.initializeApp({ apiKey:"AIzaSyCssm-z4wtOWcK1qvbJc2SIQ6Pvc3JEszY", authDomain:"health-fdf5b.firebaseapp.com", projectId:"health-fdf5b" });
 const auth=firebase.auth(); const db=firebase.firestore();
 let remoteDocRef;
 
-/***** 2. Helpers *****/
+/***** Helpers *****/
 const LS_KEY='dpt-db';
 const todayStr=()=>new Date().toISOString().slice(0,10);
 const loadData=()=>JSON.parse(localStorage.getItem(LS_KEY)||'{}');
 const saveData=d=>localStorage.setItem(LS_KEY,JSON.stringify(d));
 const getDayTotal=d=>loadData()[d]||0;
 
-/***** 3. Toast *****/
+/***** Toast *****/
 function showToast(msg){
   const toast=document.getElementById('toast');
   const box=document.getElementById('toastMsg');
   box.textContent=msg;
   toast.classList.remove('hidden');
-  // trigger transition
   requestAnimationFrame(()=>box.classList.remove('opacity-0'));
-  setTimeout(()=>{
-    box.classList.add('opacity-0');
-    setTimeout(()=>toast.classList.add('hidden'),300);
-  },1200);
+  setTimeout(()=>{ box.classList.add('opacity-0'); setTimeout(()=>toast.classList.add('hidden'),300); },1200);
 }
 
-/***** 4. Tasks *****/
+/***** Flash bouton *****/
+function flash(btn){
+  btn.classList.remove('bg-gray-800');
+  btn.classList.add('bg-emerald-700');
+  setTimeout(()=>{ btn.classList.add('bg-gray-800'); btn.classList.remove('bg-emerald-700'); },200);
+}
+
+/***** Tasks *****/
 const TASKS=[
   {id:1,name:"Boire un verre d'eau",pts:1},
   {id:2,name:"Étirements matinaux",pts:2},
@@ -78,7 +79,7 @@ const TASKS=[
   {id:5,name:"Lecture 10 pages",pts:4}
 ];
 
-/***** 5. UI refs *****/
+/***** UI refs *****/
 const scoreEl=document.getElementById('dailyScore');
 const labelEl=document.getElementById('todayLabel');
 const main=document.getElementById('mainContent');
@@ -87,13 +88,11 @@ const tabStats=document.getElementById('tabStats');
 const resetBtn=document.getElementById('resetBtn');
 let chartInstance=null,currentTab='tasks',currentRange='7';
 
-/***** 6. Renderers (identiques à avant) *****/
+/***** Renderers (modif légère dans renderTasks) *****/
 function setActive(tab){
   currentTab=tab;
-  tabTasks.classList.toggle('bg-emerald-600',tab==='tasks');
-  tabTasks.classList.toggle('bg-gray-700',tab!=='tasks');
-  tabStats.classList.toggle('bg-emerald-600',tab==='stats');
-  tabStats.classList.toggle('bg-gray-700',tab!=='stats');
+  tabTasks.classList.toggle('bg-emerald-600',tab==='tasks'); tabTasks.classList.toggle('bg-gray-700',tab!=='tasks');
+  tabStats.classList.toggle('bg-emerald-600',tab==='stats'); tabStats.classList.toggle('bg-gray-700',tab!=='stats');
 }
 function renderTasks(){
   setActive('tasks');
@@ -105,35 +104,29 @@ function renderTasks(){
     const btn=document.createElement('button');
     btn.className='w-full mb-3 px-4 py-3 rounded-xl bg-gray-800 hover:bg-emerald-700 shadow';
     btn.innerHTML=`${t.name}<span class='float-right font-semibold'>+${t.pts}</span>`;
-    btn.onclick=()=>{ addPoints(today,t.pts); scoreEl.textContent=getDayTotal(today); showToast(`+${t.pts} pts ✅`); };
+    btn.onclick=()=>{
+      addPoints(today,t.pts);
+      scoreEl.textContent=getDayTotal(today);
+      showToast(`+${t.pts} pts ✅`);
+      flash(btn);
+    };
     main.appendChild(btn);
   });
 }
-function renderStats(){ /* identique */ }
-function renderRange(r){ /* identique */ }
+function renderStats(){ /* inchangé */ }
+function renderRange(r){ /* inchangé */ }
 
-/***** 7. Sync & Reset *****/
-function addPoints(d,pts){
-  const dbData=loadData(); dbData[d]=(dbData[d]||0)+pts; saveData(dbData);
-  remoteDocRef&&remoteDocRef.set(dbData).catch(console.error);
-}
-function resetToday(){
-  const d=todayStr(); const dbData=loadData(); dbData[d]=0; saveData(dbData);
-  remoteDocRef&&remoteDocRef.set(dbData).catch(console.error);
-  scoreEl.textContent='0'; if(currentTab==='stats')renderRange(currentRange);
-  showToast('Score remis à 0');
-}
-function startRealtimeSync(){ /* identique */ }
+/***** Sync & Reset *****/
+function addPoints(d,pts){ const dbData=loadData(); dbData[d]=(dbData[d]||0)+pts; saveData(dbData); remoteDocRef&&remoteDocRef.set(dbData).catch(console.error); }
+function resetToday(){ const d=todayStr(); const dbData=loadData(); dbData[d]=0; saveData(dbData); remoteDocRef&&remoteDocRef.set(dbData).catch(console.error); scoreEl.textContent='0'; if(currentTab==='stats')renderRange(currentRange); showToast('Score remis à 0'); }
+function startRealtimeSync(){ /* inchangé */ }
 
-/***** 8. Init *****/
+/***** Init *****/
 function initUI(){ tabTasks.onclick=renderTasks; tabStats.onclick=renderStats; resetBtn.onclick=resetToday; renderTasks(); }
 
-auth.signInAnonymously().then(()=>{
-  remoteDocRef=db.collection('users').doc('global');
-  remoteDocRef.get().then(snap=>{ if(snap.exists) localStorage.setItem(LS_KEY,JSON.stringify(snap.data())); initUI(); startRealtimeSync(); }).catch(err=>{console.error(err); initUI();});
-}).catch(console.error);
+auth.signInAnonymously().then(()=>{ remoteDocRef=db.collection('users').doc('global'); remoteDocRef.get().then(snap=>{ if(snap.exists) localStorage.setItem(LS_KEY,JSON.stringify(snap.data())); initUI(); startRealtimeSync(); }).catch(err=>{console.error(err); initUI();}); }).catch(console.error);
 
-/***** 9. PWA offline *****/
+/***** PWA offline *****/
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw-v2.js').catch(console.error); }
 </script>
 </body>
