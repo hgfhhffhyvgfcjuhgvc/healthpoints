@@ -39,7 +39,7 @@ firebase.initializeApp({
 });
 const auth = firebase.auth();
 const db   = firebase.firestore();
-let remoteDocRef, uid;
+let remoteDocRef;
 
 /* ---------- 2. LOCAL STORAGE ---------- */
 const LS_KEY = 'dpt-db';
@@ -48,7 +48,7 @@ const loadData = () => JSON.parse(localStorage.getItem(LS_KEY)||'{}');
 const saveData = d => localStorage.setItem(LS_KEY, JSON.stringify(d));
 const getDayTotal = d => loadData()[d]||0;
 
-/* ---------- 3. TASKS CONFIG ---------- */
+/* ---------- 3. TASKS ---------- */
 const TASKS = [
   {id:1,name:"Boire un verre d'eau",pts:1},
   {id:2,name:"Étirements matinaux",pts:2},
@@ -65,7 +65,7 @@ const tabTasks=document.getElementById('tabTasks');
 const tabStats=document.getElementById('tabStats');
 let chartInstance=null,currentTab='tasks',currentRange='7';
 
-/* ---------- 5. RENDERERS ---------- */
+/* ---------- 5. RENDER --------- */
 function setActive(tab){
   currentTab=tab;
   tabTasks.classList.toggle('bg-emerald-600',tab==='tasks');
@@ -73,7 +73,6 @@ function setActive(tab){
   tabStats.classList.toggle('bg-emerald-600',tab==='stats');
   tabStats.classList.toggle('bg-gray-700',  tab!=='stats');
 }
-
 function renderTasks(){
   setActive('tasks');
   const today=todayStr();
@@ -88,7 +87,6 @@ function renderTasks(){
     main.appendChild(btn);
   });
 }
-
 function renderStats(){
   setActive('stats');
   labelEl.textContent='';
@@ -103,11 +101,10 @@ function renderStats(){
   document.querySelectorAll('.range').forEach(b=>b.onclick=e=>renderRange(e.target.dataset.r));
   renderRange(currentRange);
 }
-
 function renderRange(r){
   currentRange=r;
   const dbData=loadData(), labels=[], values=[];
-  if(r==='m'){   // 12 derniers mois
+  if(r==='m'){
     const monthly={};
     for(const [d,v] of Object.entries(dbData)){ const k=d.slice(0,7); monthly[k]=(monthly[k]||0)+v; }
     Object.keys(monthly).sort().slice(-12).forEach(k=>{
@@ -131,14 +128,12 @@ function renderRange(r){
 
 /* ---------- 6. SYNC ---------- */
 function addPoints(d,pts){
-  const dbData=loadData();
-  dbData[d]=(dbData[d]||0)+pts;
-  saveData(dbData);
+  const dbData=loadData(); dbData[d]=(dbData[d]||0)+pts; saveData(dbData);
   remoteDocRef&&remoteDocRef.set(dbData).catch(console.error);
 }
 function startRealtimeSync(){
   remoteDocRef.onSnapshot(snap=>{
-    if(!snap.exists())return;
+    if(!snap.exists) return;                // corrigé
     localStorage.setItem(LS_KEY,JSON.stringify(snap.data()));
     scoreEl.textContent=getDayTotal(todayStr());
     if(currentTab==='stats')renderRange(currentRange);
@@ -146,21 +141,15 @@ function startRealtimeSync(){
 }
 
 /* ---------- 7. INIT ---------- */
-function initUI(){
-  tabTasks.onclick=renderTasks;
-  tabStats.onclick=renderStats;
-  renderTasks();
-}
+function initUI(){ tabTasks.onclick=renderTasks; tabStats.onclick=renderStats; renderTasks(); }
 
-auth.signInAnonymously().then(cred=>{
-  uid=cred.user.uid;
-  remoteDocRef = db.collection('users').doc('global');
-  window.remoteDocRef=remoteDocRef;          // pour debug console
+auth.signInAnonymously().then(()=>{
+  remoteDocRef=db.collection('users').doc('global');   // doc partagé
+  window.remoteDocRef=remoteDocRef;                    // debug
   remoteDocRef.get().then(snap=>{
-    if(snap.exists()) localStorage.setItem(LS_KEY, JSON.stringify(snap.data()));
-    initUI();
-    startRealtimeSync();
-  }).catch(err=>{ console.error(err); initUI(); });
+    if(snap.exists) localStorage.setItem(LS_KEY, JSON.stringify(snap.data())); // corrigé
+    initUI(); startRealtimeSync();
+  }).catch(err=>{console.error(err); initUI();});
 }).catch(console.error);
 
 /* PWA offline */
