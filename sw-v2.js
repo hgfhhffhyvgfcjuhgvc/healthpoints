@@ -1,11 +1,11 @@
 const CACHE = 'dpt-cache-v1';
 const CORE = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-  '/tap-soft.mp3',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/healthpoints/',
+  '/healthpoints/index.html',
+  '/healthpoints/manifest.webmanifest',
+  '/healthpoints/icons/icon-192.png',
+  '/healthpoints/icons/icon-512.png',
+  '/healthpoints/tap-soft.mp3'
 ];
 
 self.addEventListener('install', e => {
