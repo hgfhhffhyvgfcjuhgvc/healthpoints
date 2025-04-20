@@ -1,7 +1,8 @@
 {
   "name": "Daily Points Tracker",
   "short_name": "DPT",
-  "start_url": "/?source=pwa",
+  "start_url": "/healthpoints/?source=pwa",
+"scope":   "/healthpoints/",
   "display": "standalone",
   "background_color": "#101827",
   "theme_color": "#10b981",
