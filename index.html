@@ -27,6 +27,16 @@
     /* objets prêts pour la synchronisation (prochaine étape) */
     const auth     = firebase.auth();
     const dbRemote = firebase.firestore();
+// --- Connexion anonyme ---
+let uid;
+auth.signInAnonymously()
+    .then(cred => {
+      uid = cred.user.uid;
+      console.log('Connecté à Firebase, UID =', uid);
+    })
+    .catch(console.error);
+// -------------------------
+
   </script>
 
   <link rel="manifest" href="manifest.webmanifest" />
