@@ -30,7 +30,7 @@
 let remoteDocRef;   // référence Firestore (sera initialisée après login)
 
 // --- Connexion anonyme + création de la référence ---
-let uid, remoteDocRef;
+let uid;
 auth.signInAnonymously()
     .then(cred => {
       uid = cred.user.uid;
