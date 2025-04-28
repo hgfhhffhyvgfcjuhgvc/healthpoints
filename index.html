@@ -88,8 +88,7 @@ function toast(msg){ const w=document.getElementById('toast'),b=document.getElem
 const flash=b=>{b.classList.add('btn-press'); setTimeout(()=>b.classList.remove('btn-press'),150);};
 
 /* Tasks & objectifs */
-const TASKS=[
-{id:1,name:"Lever tot",pts:2,goal:2},
+const TASKS=[{id:1,name:"Lever tot",pts:2,goal:2},
 {id:2,name:"Pas de téléphone matin",pts:4,goal:4},
 {id:3,name:"Boire un verre d'eau tiède",pts:1,goal:6},
 {id:4,name:"Marche 30 min",pts:3,goal:3},
@@ -106,8 +105,7 @@ const TASKS=[
 {id:15,name:"Eviter mauvaise nourriture",pts:4,goal:4},
 {id:16,name:"Brossage dents soir",pts:1,goal:1},
 {id:17,name:"Douche soir",pts:2,goal:2},
-{id:18,name:"Coucher tot",pts:2,goal:2}
-  ];
+{id:18,name:"Coucher tot",pts:2,goal:2}];
 
 /* UI refs */
 const score=document.getElementById('dailyScore'), dateLbl=document.getElementById('todayLabel'), main=document.getElementById('mainContent');
